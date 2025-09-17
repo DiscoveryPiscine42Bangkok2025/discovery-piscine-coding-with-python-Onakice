@@ -2,26 +2,34 @@
 
 def _normalize_board(board_str):
     """
-    แปลงสตริงหลายบรรทัดเป็นกระดานสี่เหลี่ยมผืนผ้า
-    - อักขระที่ไม่ใช่ตัวหมากจะถูกแทนด้วย '.'
-    - pad ให้ทุกแถวกว้างเท่ากัน
+    แปลงสตริงหลายบรรทัดเป็น 'กระดานสี่เหลี่ยมจัตุรัส'
+    - อักขระที่ไม่ใช่ตัวหมาก (P,B,R,Q,N,K) จะถูกแทนด้วย '.'
+    - ตัดช่องว่างหัว/ท้ายของแต่ละบรรทัด เพื่อกันกรณี indent จาก triple-quote
+    - ถ้าไม่ใช่สี่เหลี่ยมจัตุรัส ให้คืนค่า "invalid"
+    - ถ้าไม่มีข้อมูล ให้คืนค่า None
     """
-    raw_rows = [row for row in board_str.splitlines() if row is not None]
-    if not raw_rows:
-        return None  # undefined: ไม่มีข้อมูล
+    if board_str is None:
+        return None
+
+    lines = board_str.strip("\n").splitlines()
+    if not lines:
+        return None
 
     valid = set("PBRQNK")
     rows = []
     width = 0
-    for r in raw_rows:
-        cleaned = ''.join(ch if ch in valid else '.' for ch in r)
+    for line in lines:
+        line = line.strip()  # กัน indent
+        cleaned = ''.join(ch if ch in valid else '.' for ch in line)
         rows.append(cleaned)
         width = max(width, len(cleaned))
 
-    if width == 0:
-        return None
+    # check ขนาดของ board
+    height = len(rows)
+    if width != height or width == 0:
+        return "invalid"
 
-    # pad ให้เป็นผืนผ้า
+    # pad ให้แต่ละแถวกว้างเท่ากัน (ความยาวเท่ากับ width)
     rows = [r.ljust(width, '.') for r in rows]
     return rows
 
@@ -55,16 +63,27 @@ def checkmate(board_str, pawn_attacks_up=True):
     พิมพ์ "Success" ถ้า King ('K') ถูกเช็คโดยศัตรู (P,B,R,Q,N)
     ไม่เช่นนั้นพิมพ์ "Fail"
 
-    pawn_attacks_up=True  -> Pawn โจมตี 'ขึ้น' (จากมุมมองกระดาน): ตำแหน่ง Pawn ที่โจมตี K จะอยู่ที่ (kr+1, kc±1)
-    pawn_attacks_up=False -> Pawn โจมตี 'ลง' : ตำแหน่ง Pawn ที่โจมตี K จะอยู่ที่ (kr-1, kc±1)
+    เคสพิเศษ:
+      - ถ้าบอร์ดไม่ใช่สี่เหลี่ยมจัตุรัส: พิมพ์ "invalid board" แล้ว return
+      - ถ้าไม่มีข้อมูล/ไม่พบ K: เงียบ ๆ return
+
+    หมายเหตุ Pawn:
+      - pawn_attacks_up=True  : Pawn โจมตี 'ขึ้น' จากมุมมองตำแหน่ง K
+                                => Pawn ที่จะกิน K ต้องอยู่ที่ (kr+1, kc±1)
+      - pawn_attacks_up=False : Pawn โจมตี 'ลง'
+                                => Pawn ที่จะกิน K ต้องอยู่ที่ (kr-1, kc±1)
     """
     rows = _normalize_board(board_str)
     if rows is None:
-        return  # undefined: ไม่พิมพ์อะไร
+        return
+    # return invalid board เมื่อ invalid
+    if rows == "invalid":
+        print("invalid board")
+        return
 
     pos = _find_king(rows)
     if pos is None:
-        return  # undefined: ไม่พบ K
+        return
 
     kr, kc = pos
     h, w = len(rows), len(rows[0])
@@ -77,9 +96,7 @@ def checkmate(board_str, pawn_attacks_up=True):
             print("Success")
             return
 
-    # --- Pawn (แก้ทิศให้ถูกต้อง) ---
-    # ถ้าโจมตีขึ้น: P ที่จะกิน K ต้องอยู่ "แถวถัดลงมา" จาก K = kr+1
-    # ถ้าโจมตีลง:   P ต้องอยู่ "แถวถัดขึ้นไป" จาก K = kr-1
+    # --- Pawn ---
     step = 1 if pawn_attacks_up else -1
     for dc in (-1, 1):
         r, c = kr + step, kc + dc
@@ -93,7 +110,7 @@ def checkmate(board_str, pawn_attacks_up=True):
             print("Success")
             return
 
-    # --- Rook / Queen (ตรงแนว) ---
+    # --- Rook / Queen (แนวตรง) ---
     for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
         if _ray_hits(rows, kr, kc, {'R', 'Q'}, dr, dc):
             print("Success")

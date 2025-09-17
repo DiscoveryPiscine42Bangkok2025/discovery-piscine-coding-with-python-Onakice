@@ -132,6 +132,14 @@ def main():
             .N\
             """
     checkmate(board)
+    
+    print("tin")
+    board = """\
+        Q...
+        .R..
+        ..K.\
+        """
+    checkmate(board)
 
     
 if __name__ == "__main__":
